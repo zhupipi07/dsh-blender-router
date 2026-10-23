@@ -12,9 +12,11 @@
     "src",
     "data",
     "skills",
+    "docs",
     "AGENTS.md",
     "README.md",
     "README.en.md",
+    "CHANGELOG.md",
     "LICENSE",
     "cordis.patch.yml"
   ],

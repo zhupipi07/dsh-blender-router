@@ -61,6 +61,8 @@ blender_route(intent="做个齿轮")
 
 然后 `blender_rt_plan(op="catalog", args={family:"generator"})` 拿精确参数，照骨架跑。
 
+想看真实回执长什么样：[docs/example-output.md](./docs/example-output.md)（本机原文，含覆盖统计）。
+
 ## 安装
 
 ### 1) 装插件
@@ -68,6 +70,9 @@ blender_route(intent="做个齿轮")
 ```bash
 # 从 GitHub
 dsh plugin --profile web add github:<you>/dsh-blender-router
+
+# 或 Release 里下载的 tarball
+dsh plugin --profile web add ./dsh-blender-router-1.1.0.tgz
 
 # 或本地目录（开发）
 dsh plugin --profile web add .
