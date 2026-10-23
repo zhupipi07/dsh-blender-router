@@ -1,0 +1,42 @@
+{
+  "name": "dsh-blender-router",
+  "version": "1.0.0",
+  "description": "Route DSH agents to the full Blender capability surface (28 families / 186 ops) instead of primitive cubes: intent router + real usage coverage from the plugin's own trajectory log.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "data",
+    "skills",
+    "AGENTS.md",
+    "README.md",
+    "README.en.md",
+    "LICENSE",
+    "cordis.patch.yml"
+  ],
+  "keywords": ["dsh", "dsh-plugin", "blender", "ai-agent", "skill", "tooling"],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-tools": ">=0.0.1-rc <2"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-tools": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "test": "node tests/index.test.mjs && node tests/route.test.mjs && node tests/coverage.test.mjs"
+  },
+  "license": "MIT"
+}
