@@ -334,8 +334,7 @@ function registerSkill(ctx, logger) {
 export function apply(ctx, config) {
   const logger = ctx?.logger || console
   if (!defineTool) {
-    logger.warn?.('dsh-blender-router: 拿不到 @deepseek-ai/dsh-tools，工具未注册（skill 仍可用）')
-    return
+    logger.warn?.('dsh-blender-router: 拿不到 @deepseek-ai/dsh-tools，改为直接注册原始 spec（失败只告警，skill 仍可用）')
   }
   const safeRegister = (spec, label) => {
     try {
@@ -343,7 +342,7 @@ export function apply(ctx, config) {
         logger.warn?.('dsh-blender-router: 宿主没有 tools 服务，跳过 ' + label)
         return
       }
-      const tool = defineTool(spec)
+      const tool = defineTool ? defineTool(spec) : spec
       try { ctx.effect(() => ctx.tools.register(tool), label) } catch (e) { ctx.tools.register(tool) }
     } catch (e) {
       logger.warn?.('dsh-blender-router: 注册 ' + label + ' 失败：' + String((e && e.message) || e))
