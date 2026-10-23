@@ -90,7 +90,10 @@ try:
             if isinstance(bi, dict):
                 for k in ("name", "version", "category", "author"):
                     if k in bi:
-                        item[k] = str(bi[k])
+                        v = bi[k]
+                        if isinstance(v, (tuple, list)):
+                            v = ".".join(str(x) for x in v)
+                        item[k] = str(v)
         except Exception:
             pass
         addons.append(item)

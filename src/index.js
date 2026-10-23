@@ -95,7 +95,7 @@ function nativeBlock(intent, k = 4) {
   }
   const addons = Array.isArray(env.addons) ? env.addons.length : 0
   const head = `原生 / 第三方算子（Blender ${env.blender || '?'} · ${addons} 个 addon · 缓存 ${envAgeText(env)}`
-    + (env.stale ? ' · 已过期，建议 blender_env(refresh=true)' : '') + '）：'
+    + (env.stale ? ' · 已过期，刷新：blender_env(refresh=true) / blender-router env --refresh' : '') + '）：'
   const m = matchOps(intent, env, k)
   if (!m.items.length) return head + '\n  没匹配到具体算子（可能该走上面的能力族）。'
   return head + '\n'

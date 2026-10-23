@@ -1,6 +1,6 @@
 {
   "name": "dsh-blender-router",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Route DSH agents to the full Blender capability surface and the user's real addons: intent router + live environment discovery (Blender version / addons / bpy.ops) + real usage coverage.",
   "type": "module",
   "main": "./src/index.js",
@@ -8,7 +8,11 @@
     ".": "./src/index.js",
     "./package.json": "./package.json"
   },
+  "bin": {
+    "blender-router": "./bin/blender-router.mjs"
+  },
   "files": [
+    "bin",
     "src",
     "data",
     "skills",

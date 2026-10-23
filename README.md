@@ -102,6 +102,18 @@ blender_coverage(days=7)           # 应该报出「能力面覆盖 N/28 family�
 
 `blender_env` 的缓存位置：`~/.dsh/dsh-blender-router/env.json`（12 小时过期）。Blender 可执行文件按以下顺序探测：`DSH_BLENDER_EXE` → `~/.dsh/dsh-blender.config.json` 的 `blenderExe` → 安装目录 → PATH。
 
+## 在 Codex / Claude Code / Cursor 里用
+
+这些宿主没有 DSH 插件系统，用同一份知识换个壳：
+
+```bash
+blender-router route "挖个孔"      # 意图 → 能力族 + 本机真实 bpy.ops
+blender-router env --refresh      # 扫本机 Blender（版本 / addon / 算子）
+blender-router run build.py       # blender -b --python build.py
+```
+
+装法（shim + skill + 常驻指令）见 [docs/codex.md](./docs/codex.md)。CLI 源码在 `bin/blender-router.mjs`，零依赖。
+
 ## 设计取舍
 
 - **不做硬拦截。** 不做"不跑 audit 就不许导出"这种门。经验：硬门只能保证"跑过"，保证不了"跑好"，还会把重试成本转嫁给用户。
@@ -113,11 +125,13 @@ blender_coverage(days=7)           # 应该报出「能力面覆盖 N/28 family�
 ## 目录
 
 ```
+bin/blender-router.mjs       CLI（不依赖 DSH）：route / env / coverage / run
 src/index.js                 三个工具 + skill provider（纯 ESM，无构建步骤）
 src/env.js                   环境发现：探测 blender、后台扫描、缓存
 src/synonyms.js              中文意图 → 算子词 的翻译层 + 匹配
 data/ops-index.json          28 family / 186 op 的索引（与插件目录对齐）
-skills/blender-toolrouter/   随包 skill
+skills/blender-toolrouter/   随包 skill（DSH 版）
+docs/codex.md                Codex / Claude Code 用法 + Codex 版 skill
 AGENTS.md                    常驻路由表（可选装）
 tests/                       零依赖自测（node tests/*.mjs）
 ```

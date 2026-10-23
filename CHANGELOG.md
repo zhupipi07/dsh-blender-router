@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.2.0 — 2026-10-23
+
+给「没有 DSH 插件系统」的宿主（Codex / Claude Code / Cursor）用同一套能力。
+
+- **新增 CLI `blender-router`**（`bin/blender-router.mjs`，零依赖）：
+  - `route "<意图>"` 意图 → 能力族 + 本机真实 `bpy.ops`（输出自动换成 bpy 脚本口径）
+  - `env [--refresh]` 扫描/查看本机 Blender 环境
+  - `coverage [--days 7]` 读 dsh-blender-plugin 的调用日志
+  - `run <script.py>` 无头执行（`blender -b --python`）
+  - 全局 `--json`
+- 新增 `docs/codex.md`：Codex / Claude Code 的 shim、skill、AGENTS 装法。
+- addon 版本号改为点分格式（`1.0.1` 而不是 `(1, 0, 1)`）。
+- 环境过期提示同时给出 CLI 写法。
+
 ## 1.1.0 — 2026-10-21
 
 环境自适应（本轮核心）。
