@@ -15,6 +15,17 @@ description: Blender 任务的开工协议与能力路由。做 Blender 建模�
 
 > 跳过第 2 步 = 退回手写 bpy = 用户抱怨的那个现象。
 
+## 0.1 环境会变：先问机器，再问表
+
+静态 family 表只管「dsh-blender-plugin 有什么」；**用户 Blender 里装了什么，只有机器知道**（各家 addon 不同、版本不同）。
+
+- 首次 / 换机器 / 装了新 addon / 升级 Blender：`blender_env(refresh=true)`（约 10–60 秒，缓存 12 小时）。
+- 平时：`blender_route(intent=…)` 在给出 family 之后，会附一段「原生 / 第三方算子」——来自真实 `bpy.ops`，包括 addon 命名空间（如 `mmd_tools.*`、`kkbp.*`）。
+- 缓存过期、或 Blender 版本变了：再 refresh 一次。
+- 找不到 Blender：设环境变量 `DSH_BLENDER_EXE`，或给 `exe=…`。
+
+> 判断依据：`blender_env` 报的 `Blender 版本 + addon 数 + 算子数`。这三个数变了，索引就该重扫。
+
 ## 1. 意图 → family 速查
 
 | 意图 | family / 入口链 |

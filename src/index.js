@@ -15,8 +15,10 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { loadCache, refreshEnv, envAgeText } from './env.js'
+import { matchOps, describeOp } from './synonyms.js'
 
-const PLUGIN_VERSION = '1.0.0'
+const PLUGIN_VERSION = '1.1.0'
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const PKG_ROOT = path.resolve(HERE, '..')
 const SKILL_DIR = path.join(PKG_ROOT, 'skills', 'blender-toolrouter')
@@ -84,6 +86,23 @@ function scoreFamily(fam, q) {
   return { score, hits: [...new Set(hits)] }
 }
 
+/** 运行时环境里匹配到的原生/第三方算子（环境变了它跟着变） */
+function nativeBlock(intent, k = 4) {
+  const env = loadCache()
+  if (!env || !Array.isArray(env.ops) || !env.ops.length) {
+    return '原生 / 第三方算子：还没扫过本机 Blender。调一次 blender_env（约 10–60 秒，之后缓存 12 小时）'
+      + ' 就能按你真实装的 addon 路由。'
+  }
+  const addons = Array.isArray(env.addons) ? env.addons.length : 0
+  const head = `原生 / 第三方算子（Blender ${env.blender || '?'} · ${addons} 个 addon · 缓存 ${envAgeText(env)}`
+    + (env.stale ? ' · 已过期，建议 blender_env(refresh=true)' : '') + '）：'
+  const m = matchOps(intent, env, k)
+  if (!m.items.length) return head + '\n  没匹配到具体算子（可能该走上面的能力族）。'
+  return head + '\n'
+    + m.items.map((o) => '  · ' + describeOp(o)).join('\n')
+    + '\n  用法：blender_rt_do(code="bpy.ops.<上面某个>()")；参数名照括号，值自己填。'
+}
+
 function route(intent, k) {
   const fams = allFamilies()
   if (!fams.length) return { ok: false, text: '索引缺失：data/ops-index.json 读不到或格式不对。' }
@@ -110,7 +129,8 @@ function route(intent, k) {
       text: `没有 family 命中「${q}」。\n`
         + '两种情况：① 这是纯几何编辑，直接用 blender_rt_do；'
         + '② 换个说法（用动词+名词，如「挖孔」「贴材质」「查穿模」「导出 glb」），'
-        + '或用 intent="*" 看全表。',
+        + '或用 intent="*" 看全表。\n\n'
+        + nativeBlock(q, 5),
     }
   }
   const blocks = ranked.map((r, i) => {
@@ -128,6 +148,7 @@ function route(intent, k) {
     families: ranked.map((r) => r.f.f),
     text: `意图「${q}」→ 命中 ${ranked.length} 个 family（全表 ${fams.length} 个）：\n\n`
       + blocks.join('\n\n')
+      + '\n\n' + nativeBlock(q, 4)
       + '\n\n提示：参数名写错会报「不认识的参数」；不确定就先用 catalog 展开该 family。',
   }
 }
@@ -376,9 +397,51 @@ export function apply(ctx, config) {
     },
   }, 'blender-router: coverage')
 
+  safeRegister({
+    name: 'blender_env',
+    description: '扫描本机 Blender 的**真实环境**：版本、已启用 addon（含第三方）、全部 bpy.ops 算子与参数名，缓存 12 小时。'
+      + ' 因为 Blender 环境和 addon 会变，静态工具表迟早过期 —— 这个工具让路由跟着环境走。'
+      + ' 装了新 addon、升级了 Blender、换了机器之后调一次 refresh=true。第一次约 10–60 秒（addon 多会更久）。'
+      + ' 结果给 blender_route 用：它会从这份环境里挑「原生/第三方算子」。',
+    parameters: {
+      refresh: { type: 'boolean', description: 'true = 重新扫描（默认 false，读缓存；无缓存时会自动扫一次）' },
+      exe: { type: 'string', description: '指定 blender 可执行文件（默认自动探测：DSH_BLENDER_EXE / dsh-blender.config.json / 安装目录）' },
+      timeoutMs: { type: 'integer', description: '扫描超时，默认 120000' },
+    },
+    output: OUT,
+    isConcurrencySafe: () => false,
+    timeoutMs: 300000,
+    async execute(args) {
+      const refresh = !!args?.refresh
+      let env = refresh ? null : loadCache()
+      let source = '缓存'
+      if (!env) {
+        const r = await refreshEnv({ exe: args?.exe, timeoutMs: args?.timeoutMs })
+        if (!r.ok) {
+          return { text: '扫描失败：' + String(r.error || '未知原因') + '\n'
+            + '排查：① 确认 Blender 路径（可传 exe=...）；② 设环境变量 DSH_BLENDER_EXE；'
+            + '③ 首次扫描 addon 多时会慢，可加大 timeoutMs。' }
+        }
+        env = loadCache() || r
+        source = '刚扫描'
+      }
+      const addons = Array.isArray(env.addons) ? env.addons : []
+      const named = addons.map((a) => (a.name ? a.name + (a.version ? ' ' + a.version : '') : a.module)).filter(Boolean)
+      const lines = [
+        `Blender ${env.blender || '?'} · 可执行文件 ${env.exe || '?'}`,
+        `addon ${addons.length} 个${named.length ? '：' + named.slice(0, 20).join(' · ') + (named.length > 20 ? ' …' : '') : ''}`,
+        `算子 ${Array.isArray(env.ops) ? env.ops.length : 0} 个`,
+        `缓存${source === '刚扫描' ? '已更新' : '：' + envAgeText(env)}${env.stale ? '（已过期，建议 refresh=true）' : ''}`,
+        '',
+        '下一步：blender_route(intent="你要做的事") —— 它会同时给「能力族」和「你环境里真实存在的算子」。',
+      ]
+      return { text: lines.join('\n'), ok: true, blender: env.blender || null, addons: addons.length, ops: Array.isArray(env.ops) ? env.ops.length : 0 }
+    },
+  }, 'blender-router: env')
+
   registerSkill(ctx, logger)
-  logger.info?.('dsh-blender-router v' + PLUGIN_VERSION + ' 已加载（blender_route / blender_coverage + skill ' + SKILL_NAME + '）')
+  logger.info?.('dsh-blender-router v' + PLUGIN_VERSION + ' 已加载（blender_route / blender_env / blender_coverage + skill ' + SKILL_NAME + '）')
 }
 
-export const __internals = { route, summarize, coverageText, resolveTrajectoryDir, scoreFamily, PLUGIN_VERSION }
+export const __internals = { route, summarize, coverageText, resolveTrajectoryDir, scoreFamily, nativeBlock, matchOps, PLUGIN_VERSION }
 export default { name: 'dsh-blender-router', apply }

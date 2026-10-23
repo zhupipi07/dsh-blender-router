@@ -3,7 +3,9 @@
 
 装了 `dsh-blender-plugin` 就有 28 个能力族 / 186 个 op。**默认错误是只拿 `primitive_cube_add` 开工**——那只是其中一两个。
 
-**开工三步**：① `blender_rt_cmd(name="get_scene_info")` 认现场 → ② `blender_route(intent="你要做的事")` 选能力族（或 `blender_rt_plan(op="catalog")` 查全表）→ ③ `blender_rt_do(..., see=true)` 改一步看一眼。
+**开工三步**：① `blender_rt_cmd(name="get_scene_info")` 认现场 → ② `blender_route(intent="你要做的事")` 选能力族和真实算子（或 `blender_rt_plan(op="catalog")` 查全表）→ ③ `blender_rt_do(..., see=true)` 改一步看一眼。
+
+> 环境和 addon 会变（各家装的插件不同、Blender 版本也不同）。第一次开工、或换了机器/装了新 addon 之后，先调 `blender_env`（`refresh=true` 重扫，约 10–60 秒，缓存 12 小时）——`blender_route` 会从你**真实装的** addon 和 `bpy.ops` 里挑算子，而不是照一张写死的表。
 
 | 你要做的事 | 入口链 |
 |---|---|

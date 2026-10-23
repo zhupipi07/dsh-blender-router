@@ -18,11 +18,35 @@
 
 | 能力 | 是什么 |
 |---|---|
-| `blender_route(intent)` | 意图 → 该用哪个能力族 / 哪条入口链。一次调用替代读 11 KB 目录 |
+| `blender_route(intent)` | 意图 → 该用哪个能力族 / 哪条入口链。一次调用替代读 11 KB 目录；**同时列出你本机真实存在的算子** |
+| `blender_env(refresh?)` | 扫描本机 Blender：版本、已启用 addon（含第三方）、2660+ 个 `bpy.ops` 算子与参数名，缓存 12 小时 |
 | `blender_coverage(days)` | 读插件自己的 trajectory 日志，统计**真的用了几种**（用了几个 family、最常用 op、哪些没用过、plan 占比） |
 | 随包 skill `blender-toolrouter` | 开工协议：三步法、工具层选择、禁手写清单、交付三道门 |
 
 再加一份可选的 `AGENTS.md` 路由表（约 900 tokens），常驻在模型每次请求的上下文里——因为"每轮都看得见"比"想起来加载"可靠一个量级。
+
+## 环境会变怎么办（v1.1）
+
+**这是本插件和「写死的工具表」最大的区别。**
+
+每个人的 Blender 都不是同一个环境：装的行星插件、MMD Tools、KKB、BoxCutter、Node Wrangler 各不相同，版本可能是 4.2 也可能是 5.2。所以：
+
+- 静态索引只记「**能力族**」（shape / sculpt / material / deliver …）——这一层跨版本稳定；
+- **具体算子从你机器上现扫**：`blender -b` 起一个独立后台进程，读用户 prefs，把 `版本 + 已启用 addon + 全部 bpy.ops（id / 描述 / 参数名）` dump 成 JSON，缓存到 `~/.dsh/dsh-blender-router/env.json`；
+- `blender_route` 会把「中文意图」先翻译成英文算子词（倒角→bevel、挖孔→boolean…），再去这份真实环境里匹配，返回 `bpy.ops.xxx()` 调用行；
+- 常见修改器会直接给合成行，例如 `bpy.ops.object.modifier_add(type="BOOLEAN")`，不用模型自己猜。
+
+举例（本机实测，Blender 5.2.0 + 12 个 addon，2660 个算子）：
+
+```
+blender_route(intent="挖个孔")
+→ 能力族：audit（若是检查）…
+→ 原生/第三方算子：
+   · bpy.ops.object.modifier_add(type="BOOLEAN")
+   · bpy.ops.mesh.intersect_boolean()（参数：operation, use_swap, use_self, threshold, solver）
+```
+
+刷新时机：装了新 addon、升级 Blender、换机器 → `blender_env(refresh=true)`。判断依据就是它报的「版本 + addon 数 + 算子数」。扫描不碰你正在跑的 GUI 会话（独立进程）。
 
 ## 效果
 
@@ -49,7 +73,7 @@ dsh plugin --profile web add github:<you>/dsh-blender-router
 dsh plugin --profile web add .
 ```
 
-装完**重启 DSH**，新会话里应出现 `blender_route` / `blender_coverage` 两个工具，技能目录里出现 `blender-toolrouter`。
+装完**重启 DSH**，新会话里应出现 `blender_route` / `blender_env` / `blender_coverage` 三个工具，技能目录里出现 `blender-toolrouter`。
 
 ### 2) 装常驻路由表（推荐）
 
@@ -63,23 +87,30 @@ dsh plugin --profile web add .
 ### 3) 验证
 
 ```
+blender_env                        # 首次：扫本机 Blender（版本 / addon / 算子数）
 blender_route(intent="*")          # 应该列出 28 个 family
+blender_route(intent="倒个角")      # 应该给出 modifier_add(type="BEVEL") 等真实算子
 blender_coverage(days=7)           # 应该报出「能力面覆盖 N/28 family」
 ```
 
 `blender_coverage` 的日志位置：`<workDir>/trajectory/*.jsonl`，`workDir` 取自 `~/.dsh/dsh-blender.config.json`，也可用环境变量 `DSH_BLENDER_WORKDIR` 或入参 `dir` 指定。
 
+`blender_env` 的缓存位置：`~/.dsh/dsh-blender-router/env.json`（12 小时过期）。Blender 可执行文件按以下顺序探测：`DSH_BLENDER_EXE` → `~/.dsh/dsh-blender.config.json` 的 `blenderExe` → 安装目录 → PATH。
+
 ## 设计取舍
 
 - **不做硬拦截。** 不做"不跑 audit 就不许导出"这种门。经验：硬门只能保证"跑过"，保证不了"跑好"，还会把重试成本转嫁给用户。
-- **不做工具包装。** 不代理 dsh-blender-plugin 的任何调用，只做索引与统计——所以两个插件升级互不阻塞。
+- **不做工具包装。** 不代理 dsh-blender-plugin 的任何调用，只做索引、发现与统计——所以两个插件升级互不阻塞。
+- **唯一会起进程的地方是环境扫描。** `blender -b` 一次性读环境、写缓存，失败只降级（路由退回静态族索引）。
 - **全部降级安全。** 拿不到 `@deepseek-ai/dsh-tools`、没有 tools 服务、索引缺失、日志不存在，都只告警，不会弄挂宿主。
 - **统计只读插件自己的日志。** 不需要 hook 宿主，不增加运行时开销。
 
 ## 目录
 
 ```
-src/index.js                 两个工具 + skill provider（纯 ESM，无构建步骤）
+src/index.js                 三个工具 + skill provider（纯 ESM，无构建步骤）
+src/env.js                   环境发现：探测 blender、后台扫描、缓存
+src/synonyms.js              中文意图 → 算子词 的翻译层 + 匹配
 data/ops-index.json          28 family / 186 op 的索引（与插件目录对齐）
 skills/blender-toolrouter/   随包 skill
 AGENTS.md                    常驻路由表（可选装）
@@ -91,13 +122,16 @@ tests/                       零依赖自测（node tests/*.mjs）
 ```bash
 node tests/index.test.mjs     # 索引完整性（28 family / 186 op / 字段齐全）
 node tests/route.test.mjs     # 意图路由（10 条真实意图 + 全表 + 无命中退路）
+node tests/env.test.mjs       # 环境发现：路径探测 / 缓存 / 同义词 / 伪环境匹配
 node tests/coverage.test.mjs  # 读真实 trajectory，统计口径
 ```
 
 ## 已知边界
 
-- 路由是**关键词 + 字符二元组**匹配，不是语义模型；命中率靠 `data/ops-index.json` 的 `kw` 词表维护。遇到不认识的意图，最可靠的做法仍是 `intent="*"` 看全表。
-- 索引基于 `dsh-blender-plugin v2.5.0`（186 op）。插件升级后 op 名单可能变，`blender_route` 只给"族"和"入口链"，精确参数始终以 `catalog` 为准。
+- 路由是**关键词 + 字符二元组**匹配，不是语义模型；命中率靠 `data/ops-index.json` 的 `kw` 词表与 `src/synonyms.js` 的概念表维护。遇到不认识的意图，最可靠的做法仍是 `intent="*"` 看全表。
+- 族索引基于 `dsh-blender-plugin v2.5.0`（186 op）。插件升级后 op 名单可能变——所以精确参数始终以 `catalog` 为准，索引只负责"把你带到那一族"。
+- **算子层不是写死的**：每次 `blender_env` 现扫。首次扫描 10–60 秒（addon 多时更久），之后读缓存。
+- 扫描用 `blender -b` 起独立进程读用户 prefs，不碰正在跑的 GUI 会话；但会支付一次 Blender 启动开销。
 - 它提高"想到用某个能力"的概率，不提高模型本身的美术判断。
 
 ## License
