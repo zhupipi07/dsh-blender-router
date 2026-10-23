@@ -1,6 +1,0 @@
-# dsh-blender-router bundle layer.
-# Loaded as a profile bundle: `dsh plugin add` reads `dsh.bundle.patch` from package.json.
-- insert:
-    - id: dsh-blender-router
-      name: dsh-blender-router
-      config: {}
